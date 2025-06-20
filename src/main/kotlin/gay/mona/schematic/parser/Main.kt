@@ -1,7 +1,9 @@
 package gay.mona.schematic.parser
 
 import net.sandrohc.schematic4j.SchematicLoader
-import net.sandrohc.schematic4j.schematic.types.Pair
+import net.sandrohc.schematic4j.schematic.LitematicaSchematic
+import net.sandrohc.schematic4j.schematic.types.SchematicBlock
+import net.sandrohc.schematic4j.schematic.types.SchematicBlock.AIR
 import java.nio.file.StandardOpenOption
 import kotlin.io.path.Path
 import kotlin.io.path.listDirectoryEntries
@@ -18,13 +20,17 @@ object Main {
         return t
     }
 
-    @JvmStatic
+    operator fun LitematicaSchematic.get(x: Int, y: Int, z: Int): SchematicBlock {
+        val region = this.regions.first()
+        return region.blockStatePalette[region.blockStates[region.posToIndex(x, y, z)]]
+    }
 
+    @JvmStatic
     fun main(args: Array<String>) = timed("Mering all") {
 
-        val list = Path("ch").listDirectoryEntries().map {
+        val list = Path("ch").listDirectoryEntries().filter { it.name.endsWith("matic") }.map {
             timed(it.name) {
-                SchematicLoader.load(it)
+                SchematicLoader.load(it) as LitematicaSchematic
             }
         }
 
@@ -34,14 +40,15 @@ object Main {
             StandardOpenOption.CREATE
         ).use {
             for (y in 20..200) {
-                for (x in 0..630) {
-                    for (z in 0..630) {
-                        if (x == 0 && z == 0) {
-                            val index = (396900 * y) + 630
-                            println("${index / (79380000.toFloat()) * 100}% ($index / 79.380.000) ($x:$y:$z)")
-                        }
+                println("Processing Y: $y")
+                for (x in 0..628) {
+                    for (z in 0..628) {
+                        val block = list
+                            .map { schematic -> schematic[x, y, z] }
+                            .groupBy { block -> block }
+                            .maxBy { (block, values) -> if (block == AIR) values.size * 0.5f else values.size.toFloat() }
+                            .key
 
-                        val block = list.map { it.block(x, y, z) }.groupBy { it }.maxBy { it.value.size }.key
                         it.write("$x:$y:$z ${block.name}\n")
                     }
                 }
